@@ -5,33 +5,58 @@ import numpy as np
 serialName = "COM5" # O gerenciador de dispositivos informa a porta
 
 def main():
-    print("Iniciou o main")
     try:
         # Ativa comunicacao. Inicia os threads e a comunicação seiral
         com1 = enlace(serialName)
         com1.enable() 
         print("Abriu a comunicação")
+        print("Esperando byte de sacrifício...\n")
+        rxBuffer, nRx = com1.getData(1)
+        com1.rx.clearBuffer()
+        time.sleep(.1)
         
         # Escreva o código aqui:
-        transmission = True
+            
+            # Recebendo os dados 
+        receiving = True
         data = b""
-        # recived_data = b'\xff\x00\xaa\xff\x00\xbb\x00\xff\xbb\x00\x00\xff\xbb\xff\x00\xaa\xff\x00\x00\xbb\xff\x00\x00\xbb\xff\xbb\x00\x00\xff\x00\x00\xbb\x00\xff\x00\xff\x00\xaa\xff\xbb\xff\x00\x00\x00\x00\xff\x00\xaa\xff\x00\x00\xbb\xff\x00\xff\xbb\xff\x00\xaa\xff\x00\xaa\xff\x00\xbb\x00\xff\xbb\xff\x00\x00\x00\x00\xff\xbb\x00\xff\x00\x00\xbb\x00\xff\x00\x00\x00\x00\xff\xbb\x00\x00\xff\x00\x00\xbb\xff\xbb\x00\x00\xff\xbb\xff\xff'
-        while transmission:
+        print('Aguardando o client enviar os comandos')
+        while receiving:
             recived_data = com1.rx.getAllBuffer(0)
+            data += recived_data
             if recived_data != b'':
-                print(f'{recived_data} recebido')
-            data = data + recived_data
-            if  b'\xFF\xFF' in data:
-                transmission = False
+                print(f'\nRecebido {len(recived_data)} bytes:\n{recived_data}\n')
+            time.sleep(0.1)
+            if  b'\xBD' in data:
+                receiving = False
 
-        commands = [ command for command in data.split(b'\xff') if command != b'' ]
+            # Limpando ruidos do recebimento
+        while data[0].to_bytes() != b'\xff':
+            data = data[1:]
+        while data[-1].to_bytes() != b'\xBD':
+            data = data[:len(data)-1]
 
-        txBuffer = (len(commands)).to_bytes()
-        com1.sendData(np.asarray(txBuffer))
+            # Separando comandos
+        data_instructions, data_commands = [ part for part in data.split(b'\xff') if part != b'' ]
+        instructions = []
+        for byte in data_instructions:
+            binary = bin(byte)
+            instructions.append(int('0b'+binary[2:-4], 2))
+            instructions.append(int('0b'+binary[-4:], 2))
+        instructions = [command_len for command_len in instructions if command_len != 0]
+        commands = []
+        for end in instructions:
+            commands.append(data_commands[:end])
+            data_commands = data_commands[end:]
 
         print(f'{len(commands)} comandos recebidos')
         for command in commands:
             print(command)
+
+            # Enviando a resposta para o client
+        txBuffer = (len(commands)).to_bytes()
+        com1.sendData(np.asarray(txBuffer))
+        print(f'Byte de resposta enviado')
     
         # Encerra comunicação.
         print("\nComunicação encerrada")
