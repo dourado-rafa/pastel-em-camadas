@@ -41,8 +41,12 @@ def main():
         instructions = []
         for byte in data_instructions:
             binary = bin(byte)
-            instructions.append(int('0b'+binary[2:-4], 2))
-            instructions.append(int('0b'+binary[-4:], 2))
+            if len(binary[2:]) > 4:
+                instructions.append(int('0b'+binary[2:-4], 2))
+                instructions.append(int('0b'+binary[-4:], 2))
+            else:
+                print(binary)
+                instructions.append(int(binary, 2))
         instructions = [command_len for command_len in instructions if command_len != 0]
         commands = []
         for end in instructions:
