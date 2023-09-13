@@ -1,13 +1,10 @@
 from enlace import *
-from datagrama import Datagrama as Dt
+from datagrama import datagrama
 import time, random
 import numpy as np
+import traceback
 
 serialName = "COM5" # O gerenciador de dispositivos informa a porta
-
-OK = ('OK'.encode()+b'\x00\x00\x00\x00').decode()
-END = ('END'.encode()+b'\x00\x00\x00').decode()
-ERROR = ('ERROR'.encode()+b'\x00').decode()
 
 def receive_package(com:enlace, head_length:int=12, eop_expected:str='END') -> tuple[bytearray, bytearray]:
     head = com.rx.getNData(head_length)
@@ -18,7 +15,7 @@ def receive_package(com:enlace, head_length:int=12, eop_expected:str='END') -> t
     print('Pacote invalido! EOP diferente do esperado')
     return None
 
-def wait_response(com:enlace, type_expected:str, wait:int) -> (bool | str):
+def wait_response(com:enlace, wait:int) -> (bool | int):
     start = time.time()
     wait = 1e10 if wait == 0 else wait
     while (time.time() - start) <= wait:
@@ -26,10 +23,8 @@ def wait_response(com:enlace, type_expected:str, wait:int) -> (bool | str):
             package = receive_package(com)
             if package is not None:
                 head, payload = package
-                type_recived = head[5].to_bytes().decode()
-                message_recived = head[6:].decode()
-                if type_expected == type_recived:
-                    return message_recived
+                message_recived = int.from_bytes(head[6:8])
+                return message_recived
             return None
     return False
 
@@ -52,20 +47,20 @@ def main():
         print("Abriu a comunicação")
         
         # Escreva o código aqui:
-        fragments = fragment_file('../img/star.png')
+        fragments = fragment_file('../img/teapot.png')
         current, total = 1, len(fragments)
-        message = 'SEND'    
+        code = 100
 
         status = 'CONNECTING'
         while 'END' not in status:
 
             if status == 'CONNECTING':
                 print('Verificando se o Servidor está Ativo')
-                com1.sendData(Dt.datagrama(0, total, 'S', 'ONLINE'))
+                com1.sendData(datagrama(0, total, code=511))
                 time.sleep(.01)
 
-                response = wait_response(com1, 'S', 5)
-                if response == OK:
+                response = wait_response(com1, 5)
+                if response == 202:
                     print('Conexão estabelecida!')
                     status = 'TRANSMITTING'
                 else:
@@ -74,21 +69,21 @@ def main():
                         status = 'END-CONNECTION-FAILED'
 
             elif status == 'TRANSMITTING':
-                com1.sendData(Dt.datagrama(current, total, 'P', message, fragments[current-1]))
+                com1.sendData(datagrama(current, total, code=code, payload=fragments[current-1]))
                 time.sleep(.01)
                 print(f'\nPacote [{current}/{total}] enviado! Aguardando confirmação de recebimento...')
 
-                response = wait_response(com1, 'P', 3)
-                if response == OK:
+                response = wait_response(com1, 3)
+                if response == 200:
                     print(f'Pacote [{current}/{total}] recebido com sucesso pelo cliente!\nEnviando próximo pacote...')
-                    message = 'SEND'
+                    code = 100
                     current += 1
-                elif response == ERROR:
+                elif response in [409, 413]:
                     print(f'Houve uma falha no recebimento do pacote [{current}/{total}]!\nReenviando pacote...')
-                    message = 'RESEND'
+                    code = 205
                 elif not response:
                     print(f'Nenhuma resposta recebida!\nReenviando pacote...')
-                    message = 'RESEND'
+                    code = 205
 
                 if current > total:
                     print(f'\nTodos os {total} pacos foram enviados!')
@@ -97,9 +92,10 @@ def main():
             elif status == 'CONFIRMING':
                 print(f'Aguardando confirmação de recebimento...')
 
-                response = wait_response(com1, 'S', 0)
-                if response == END:
+                response = wait_response(com1, 0)
+                if response == 418:
                     print(f'Todos os {total} pacotes foram recebidos com sucesso!')
+                    print("I'm a Teapot!")
                     status = 'END-TRANSMISSION-SUCESSFUL'
                 else:
                     print(f'Algo na transmissão falhou, mas não há nada a se fazer... :(')
@@ -109,8 +105,8 @@ def main():
         print("\nComunicação encerrada")
         com1.disable()
         
-    except Exception as erro:
-        print(f"ops! :-\n{erro}")
+    except Exception as error:
+        print(f"ops! :-{traceback.format_exc()}")
         com1.disable()
         
 if __name__ == "__main__": 
