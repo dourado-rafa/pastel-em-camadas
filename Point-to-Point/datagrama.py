@@ -1,5 +1,4 @@
 import numpy as np
-from enlace_server.enlace import enlace
 
 def fragment_file(filepath:str, length:int=114) -> list[bytearray]:
     fragments = []
@@ -7,7 +6,7 @@ def fragment_file(filepath:str, length:int=114) -> list[bytearray]:
         content = file.read()
         for i in range(0, len(content), length):
             fragment = content[i:i+length] if i+length < len(content) else content[i:]
-            fragments.append(fragment)
+            fragments.append(np.asarray(fragment))
     file.close()
     return fragments
 
@@ -24,13 +23,13 @@ def head(type:int=0, server_number:int=0, current:int=0, total:int=0, id:int=0, 
     head += 2*b'\x00'
     return head
 
-def datagrama(type:int=0, server_number:int=0, current:int=0, total:int=0, id:int=0, restart:int=0, sucess:int=0, 
+def datagrama(type:int=0, server_number:int=0, total:int=0, current:int=0, id:int=0, restart:int=0, sucess:int=0, 
               payload:bytearray=b'', eop:str=b'\xAA\xBB\xCC\xDD') -> bytearray:
     size_id = len(payload) if id == 0 else id
     return np.asarray(head(type, server_number, total, current, size_id, restart, sucess) + payload + eop)
 
 class Message():
-    def __init__(self, type:int=0, server_number:int=0, current:int=0, total:int=0, size_id:int=0, restart:int=0, sucess:int=0, payload:bytearray=b'', eop:bytearray=b'') -> None:
+    def __init__(self, type:int=0, server_number:int=0, total:int=0, current:int=0, size_id:int=0, restart:int=0, sucess:int=0, payload:bytearray=b'', eop:bytearray=b'') -> None:
         self.type = type
         self.server_number = server_number
         self.current = current
