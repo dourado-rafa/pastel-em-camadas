@@ -5,7 +5,7 @@ import time, random
 import traceback
 
 serialName = "COM5" # O gerenciador de dispositivos informa a porta
-ERROR_CHANCE = 0.05
+ERROR_CHANCE = 0
 
 def receive_message(com:enlace, head_length:int=12, eop_expected:str='END'.encode()) -> Message:
     head = com.rx.getNData(head_length)
