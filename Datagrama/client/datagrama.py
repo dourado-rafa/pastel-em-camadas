@@ -1,3 +1,5 @@
+import numpy as np
+
 def head(n:int=0, current:int=0, total:int=0, origin:str='', code:int=0) -> bytearray:
     head = b''
     head += n.to_bytes(1)
@@ -8,8 +10,33 @@ def head(n:int=0, current:int=0, total:int=0, origin:str='', code:int=0) -> byte
     head += 4*b'\x00'
     return head
 
-def datagrama(current:int=0, total:int=0, origin:str='C', code:int=0, payload:bytearray=b'', eop:str='END') -> bytearray:
-    return head(len(payload), current, total, origin, code) + payload + eop.upper().encode()
+def datagrama(current:int=0, total:int=0, origin:str='C', code:int=0, payload:bytearray=b'', eop:str='END', size:int=-1) -> bytearray:
+    if size == -1:
+        size = len(payload)
+    return np.asarray(head(size, current, total, origin, code) + payload + eop.upper().encode())
+
+class Message():
+    def __init__(self, size:int=0, current:int=0, total:int=0, origin:str='', code:int=204, payload:bytearray=b'', eop:str='') -> None:
+        self.size = size
+        self.current = current
+        self.total = total
+        self.origin = origin
+        self.code = code
+        self.message = DECODER[code]
+        self.payload = payload
+        self.eop = eop
+        
+    def isValid(self) -> bool:
+        return (self.origin == '' and self.code != 204)
+    
+def read_datagrama(head:bytearray, payload:bytearray, eop:bytearray) -> Message:
+    size = head[0]
+    current = int.from_bytes(head[1:3])
+    total = int.from_bytes(head[3:5])
+    code = int.from_bytes(head[6:8])
+    origin = head[5].to_bytes().decode()
+    return Message(size, current, total, origin, code, payload, eop)
+
 
 DECODER = {
     100: "Continue", # Continue mandando os pacotes
@@ -18,7 +45,7 @@ DECODER = {
     201: "Created",
     202: "Accepted", # Conexão aceita
     203: "Non-Authoritative Information",
-    204: "No Content",
+    204: "No Content", # Sem conteúdo
     205: "Reset Content", # Reenviando Pacote
     206: "Partial Content",
     300: "Multiple Choices",
@@ -46,7 +73,7 @@ DECODER = {
     415: "Unsupported Media Type",
     416: "Range Not Satisfiable",
     417: "Expectation Failed",
-    418: "I'm a Teapot",
+    418: "I'm a Teapot", # I'm a Teapot
     421: "Misdirected Request",
     422: "Unprocessable Entity",
     423: "Locked",

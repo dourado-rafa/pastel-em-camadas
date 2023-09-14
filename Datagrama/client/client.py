@@ -1,32 +1,28 @@
 from enlace import *
-from datagrama import datagrama
+from datagrama import datagrama, read_datagrama, Message
+from color import color_print
 import time, random
-import numpy as np
 import traceback
 
 serialName = "COM5" # O gerenciador de dispositivos informa a porta
+ERROR_CHANCE = 0.05
 
-def receive_package(com:enlace, head_length:int=12, eop_expected:str='END') -> tuple[bytearray, bytearray]:
+def receive_message(com:enlace, head_length:int=12, eop_expected:str='END'.encode()) -> Message:
     head = com.rx.getNData(head_length)
     payload = com.rx.getNData(head[0])
-    eop = com.rx.getNData(len(eop_expected)).decode()
+    eop = com.rx.getNData(len(eop_expected))
     if eop == eop_expected:
-        return (head, payload)
+        return read_datagrama(head, payload, eop)
     print('Pacote invalido! EOP diferente do esperado')
-    return None
+    return Message() # Mensagem vazia com code 204 (No content)
 
-def wait_response(com:enlace, wait:int) -> (bool | int):
+def wait_response(com:enlace, wait:int) -> Message:
     start = time.time()
     wait = 1e10 if wait == 0 else wait
     while (time.time() - start) <= wait:
         if not com.rx.getIsEmpty():
-            package = receive_package(com)
-            if package is not None:
-                head, payload = package
-                message_recived = int.from_bytes(head[6:8])
-                return message_recived
-            return None
-    return False
+            return receive_message(com)
+    return Message() # Mensagem vazia com code 204 (No content)
 
 def fragment_file(filepath:str, length:int=50) -> list[bytearray]:
     fragments = []
@@ -60,7 +56,7 @@ def main():
                 time.sleep(.01)
 
                 response = wait_response(com1, 5)
-                if response == 202:
+                if response.code == 202:
                     print('Conexão estabelecida!')
                     status = 'TRANSMITTING'
                 else:
@@ -69,20 +65,30 @@ def main():
                         status = 'END-CONNECTION-FAILED'
 
             elif status == 'TRANSMITTING':
-                com1.sendData(datagrama(current, total, code=code, payload=fragments[current-1]))
+                size = len(fragments[current-1])
+                if random.random() < ERROR_CHANCE :
+                    color_print('\n-----> Essa menssagem está com erro! <-----', 'red')
+                    size = 0
+
+                com1.sendData(datagrama(current, total, code=code, payload=fragments[current-1], size=size))
                 time.sleep(.01)
                 print(f'\nPacote [{current}/{total}] enviado! Aguardando confirmação de recebimento...')
 
                 response = wait_response(com1, 3)
-                if response == 200:
-                    print(f'Pacote [{current}/{total}] recebido com sucesso pelo cliente!\nEnviando próximo pacote...')
+                if response.code == 200:
+                    color_print(f'Pacote [{current}/{total}] recebido com sucesso pelo cliente!\nEnviando próximo pacote...', 'green')
                     code = 100
                     current += 1
-                elif response in [409, 413]:
-                    print(f'Houve uma falha no recebimento do pacote [{current}/{total}]!\nReenviando pacote...')
+                elif response.code in [409, 413]:
+                    color_print(f'Houve uma falha no recebimento do pacote [{current}/{total}]!\nReenviando pacote...', 'yellow')
+                    if current-1 <= response.current <= current+1:
+                        current = response.current
                     code = 205
-                elif not response:
-                    print(f'Nenhuma resposta recebida!\nReenviando pacote...')
+                elif not response.isValid():
+                    color_print(f'Nenhuma resposta recebida!\nReenviando pacote...', 'yellow')
+                    code = 205
+                else:
+                    color_print(f'Pacote tipo {response.code} recebido! Não há ação para esse tipo de pacote\nReenviando pacote...', 'red')
                     code = 205
 
                 if current > total:
@@ -93,12 +99,12 @@ def main():
                 print(f'Aguardando confirmação de recebimento...')
 
                 response = wait_response(com1, 0)
-                if response == 418:
-                    print(f'Todos os {total} pacotes foram recebidos com sucesso!')
-                    print("I'm a Teapot!")
+                if response.code == 418:
+                    color_print(f'Todos os {total} pacotes foram recebidos com sucesso!', 'green')
+                    color_print("\nI'm a Teapot!", 'cyan')
                     status = 'END-TRANSMISSION-SUCESSFUL'
                 else:
-                    print(f'Algo na transmissão falhou, mas não há nada a se fazer... :(')
+                    color_print(f'Algo na transmissão falhou, mas não há nada a se fazer... :(', 'red')
                     status = 'END-TRANSMISSION-FAILED'
         
         # Encerra comunicação.
