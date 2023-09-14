@@ -8,7 +8,7 @@ def head(n:int=0, current:int=0, total:int=0, origin:str='', code:int=0) -> byte
     head += 4*b'\x00'
     return head
 
-def datagrama(current:int=0, total:int=0, origin:str='C', code:int=0, payload:bytearray=b'', eop:str='END') -> bytearray:
+def datagrama(current:int=0, total:int=0, origin:str='S', code:int=0, payload:bytearray=b'', eop:str='END') -> bytearray:
     return head(len(payload), current, total, origin, code) + payload + eop.upper().encode()
 
 DECODER = {

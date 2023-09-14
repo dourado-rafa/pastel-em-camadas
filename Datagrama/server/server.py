@@ -1,7 +1,9 @@
 from enlace import *
 import time
 import numpy as np
-from datagrama import Datagrama
+import traceback
+import sys,os
+from datagrama import datagrama
 
 serialName = "COM3" # O gerenciador de dispositivos informa a porta
 # 100: Continue
@@ -11,6 +13,12 @@ serialName = "COM3" # O gerenciador de dispositivos informa a porta
 # 413: Erro no tamanho do payload
 # 205: Reset content
 
+def clearBuffer(com:enlace) -> None:
+    com.rx.threadPause()
+    com.rx.clearBuffer()
+    time.sleep(.02)
+    com.rx.threadResume()
+
 def main():
     try:
         # Ativa comunicacao. Inicia os threads e a comunicação seiral
@@ -19,114 +27,136 @@ def main():
         print("Abriu a comunicação")
         
         # Escreva o código aqui:
-        print("Esperando mensagem")
+        handshake = False
         stop = False
         package_received = b''
+        i=1
 
         while not stop:
+
+            print("Esperando mensagem")
 
             head = com1.rx.getNData(12)
             size = head[0]
             current = int.from_bytes(head[1:3], byteorder='big')
             total = int.from_bytes(head[3:5], byteorder='big')
-            type = head[5].to_bytes(1, byteorder = 'big').decode()
-            msg = int.from_bytes(head[6:8])
+            code = int.from_bytes(head[6:8])
             payload = com1.rx.getNData(size)
             eop = com1.rx.getNData(3)
 
-            if type == "S":
+            if code == 511:
+                print("Pacote tipo STATUS recebido")
                 if eop == "END".encode():
                     print("Respondendo status")
-                    txBuffer = Datagrama.datagrama(type = "S", message="OK")
+
+                    txBuffer = datagrama(code=202)
                     com1.sendData(np.asarray(txBuffer))
                     time.sleep(0.01)
-                    
-                    print("Esperando pacote")
-                    i = 1
-                    while i <= total:
 
-                        head = com1.rx.getNData(12)
-                        size = head[0]
-                        current = int.from_bytes(head[1:3])
-                        total = int.from_bytes(head[3:5])
-                        type = head[5].to_bytes(1, byteorder = 'big').decode()
-                        msg = head[6:].decode()
-                        print(msg) 
-                        payload = com1.rx.getNData(size)
-                        eop = com1.rx.getNData(3)
+                    handshake = True
+                    print("Esperando pacote\n")
+                else:
+                    print("Erro na mensagem de status\n")
 
-                        print(head, payload, eop)
+                    txBuffer = datagrama(code=413)
+                    com1.sendData(np.asarray(txBuffer))
+                    time.sleep(0.01)
 
-                        if msg == "RESEND" and (current == i-1 or current == i):
-                            if eop != "END".encode():
-                                print("Erro: Tamanho do payload resend")
-                                com1.rx.clearBuffer()
-                                time.sleep(0.02)
-                                print(com1.rx.buffer)
-                                txBuffer = Datagrama.datagrama(current = current, total = total, type = "P", message="ERROR")
-                                com1.sendData(np.asarray(txBuffer))
-                                time.sleep(0.02)
-                            else:
-                                print(f"Pacote {current} resend OK")
-                                txBuffer = Datagrama.datagrama(current = current, total = total, type = "P", message="OK")
-                                com1.sendData(np.asarray(txBuffer))
-                                time.sleep(0.01)
-                                if not package_status or current == i:
-                                    package_status = True
-                                    package_received += payload
-                                    i += 1
+            elif handshake:
+                if code == 100:
+                    print("Pacote tipo SEND recebido")
+                    if i != current:
+                        print(f"Erro no numero do pacote, recebido: {current}, esperado: {i}\n")
 
-                        elif i != current:
-                            print(f"Erro: Numero do pacote, recebido: {current}, esperado: {i}")
-                            txBuffer = Datagrama.datagrama(current = current, total = total, type = "P", message="ERROR")
-                            com1.sendData(np.asarray(txBuffer))
-                            time.sleep(0.01)
-                            package_status = False
+                        txBuffer = datagrama(current = i, total = total, code = 409)
+                        com1.sendData(np.asarray(txBuffer))
+                        time.sleep(0.01)
+                        package_status = False
+                    elif eop != "END".encode():
+                        print(f"Erro no tamanho do pacote {current}\n")
 
-                        elif eop != "END".encode():
-                            print(f"Erro: Tamanho do payload do pacote {current}")
-                            com1.rx.clearBuffer()
-                            time.sleep(0.05)
+                        clearBuffer(com1)
+                        print(com1.rx.buffer)
+
+                        txBuffer = datagrama(current = current, total = total, code = 413)
+                        com1.sendData(np.asarray(txBuffer))
+                        time.sleep(0.02)
+                        package_status = False
+                    else:
+                        print(f"Pacote {current} OK\n")
+                        txBuffer = datagrama(current = current, total = total, code = 200)
+                        com1.sendData(np.asarray(txBuffer))
+                        time.sleep(0.01)
+                        package_status = True
+                        package_received += payload
+                        i += 1
+
+                elif code == 205: 
+                    print("Pacote tipo RESEND recebido")
+                    if current == i-1 or current == i:
+                        if eop != "END".encode():
+                            print(f"Erro no RESEND: Tamanho do pacote {current}\n")
+                            clearBuffer(com1)
                             print(com1.rx.buffer)
-                            txBuffer = Datagrama.datagrama(current = current, total = total, type = "P", message="ERROR")
+                            txBuffer = datagrama(current = current, total = total, code = 413)
                             com1.sendData(np.asarray(txBuffer))
-                            time.sleep(0.05)
+                            time.sleep(0.02)
                             package_status = False
-
                         else:
-                            print(f"Pacote {current} OK")
-                            txBuffer = Datagrama.datagrama(current = current, total = total, type = "P", message="OK")
+                            print(f"RESEND: Pacote {current} OK\n")
+                            txBuffer = datagrama(current = current, total = total, code = 200)
                             com1.sendData(np.asarray(txBuffer))
                             time.sleep(0.01)
-                            package_status = True
-                            package_received += payload
-                            i += 1
+                            if not package_status or current == i:
+                                package_status = True
+                                package_received += payload
+                                i += 1
+                    else:
+                        print(f"Erro no RESEND: Numero do pacote recebido: {current}, esperado: {i}\n")
 
-                    # Fim do while de pacotes
+                        clearBuffer(com1)
+                        print(com1.rx.buffer)
+                        txBuffer = datagrama(current = i, total = total, code = 409)
+                        com1.sendData(np.asarray(txBuffer))
+                        time.sleep(0.01)
+                        package_status = False
 
+                else:
+                    print(f"Erro: Pacote tipo {code} recebido")
+                    print(f"Numero do pacote recebido: {current}, esperado {i}\n")
+
+                    clearBuffer(com1)
+                    print(com1.rx.buffer)
+                    txBuffer = datagrama(current = i, total = total, code = 409)
+                    com1.sendData(np.asarray(txBuffer))
+                    time.sleep(0.01)
+                    package_status = False
+
+                if current == total and i == total+1:
                     print("Transmissão feita com sucesso")
-                    txBuffer = Datagrama.datagrama(type = "S", message="END")
+                    print("I'm a teapot")
+                    txBuffer = datagrama(code=418)
                     com1.sendData(np.asarray(txBuffer))
                     time.sleep(0.01)
 
-                    copia = open("./imagem_recebida.png", "wb")
+                    copia = open("../img/teapot.png", "wb")
                     copia.write(package_received)
                     copia.close()
 
+                    handshake = False
                     stop = True
-                else:
-                    print("Erro no status")
-                    txBuffer = Datagrama.datagrama(type = "S", message="ERROR")
-                    com1.sendData(np.asarray(txBuffer))
-                    time.sleep(0.01)
+            
+            else:
+                print("Não houve confirmação de status\n")
     
         # Encerra comunicação.
         print("\nComunicação encerrada")
         com1.disable()
         
     except Exception as erro:
-        print(f"ops! :-\n{erro}")
-        com1.disable()
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno)
         
 if __name__ == "__main__":
     main()
