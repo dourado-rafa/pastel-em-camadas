@@ -43,7 +43,7 @@ class Message():
         self.eop = eop
         
     def isValid(self) -> bool:
-        return (self.type == 0 and self.eop != b'\xAA\xBB\xCC\xDD')
+        return (self.type != 0 and self.eop == b'\xAA\xBB\xCC\xDD')
     
 def read_datagrama(head:bytearray, payload:bytearray, eop:bytearray) -> Message:
     type = head[0]
