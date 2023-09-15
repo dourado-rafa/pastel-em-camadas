@@ -1,4 +1,5 @@
 import numpy as np
+import time, random
 
 def fragment_file(filepath:str, length:int=114) -> list[bytearray]:
     fragments = []
@@ -6,11 +7,11 @@ def fragment_file(filepath:str, length:int=114) -> list[bytearray]:
         content = file.read()
         for i in range(0, len(content), length):
             fragment = content[i:i+length] if i+length < len(content) else content[i:]
-            fragments.append(np.asarray(fragment))
+            fragments.append(bytearray(fragment))
     file.close()
     return fragments
 
-def head(type:int=0, server_number:int=0, current:int=0, total:int=0, id:int=0, restart:int=0, sucess:int=0) -> bytearray:
+def head(type:int=0, server_number:int=0, total:int=0, current:int=0, id:int=0, restart:int=0, sucess:int=0) -> bytearray:
     head = b''
     head += type.to_bytes(1)
     head += server_number.to_bytes(1)
@@ -26,7 +27,7 @@ def head(type:int=0, server_number:int=0, current:int=0, total:int=0, id:int=0, 
 def datagrama(type:int=0, server_number:int=0, total:int=0, current:int=0, id:int=0, restart:int=0, sucess:int=0, 
               payload:bytearray=b'', eop:str=b'\xAA\xBB\xCC\xDD') -> bytearray:
     size_id = len(payload) if id == 0 else id
-    return np.asarray(head(type, server_number, total, current, size_id, restart, sucess) + payload + eop)
+    return bytearray(head(type, server_number, total, current, size_id, restart, sucess) + payload + eop)
 
 class Message():
     def __init__(self, type:int=0, server_number:int=0, total:int=0, current:int=0, size_id:int=0, restart:int=0, sucess:int=0, payload:bytearray=b'', eop:bytearray=b'') -> None:
@@ -53,3 +54,17 @@ def read_datagrama(head:bytearray, payload:bytearray, eop:bytearray) -> Message:
     restart = head[6]
     sucess = head[7]
     return Message(type, server_number, total, current, size_id, restart, sucess, payload, eop)
+
+class Timer():
+    def __init__(self, cooldown:int) -> None:
+        self.cooldown = cooldown
+        self.init = time.time()
+        self.elapsed = time.time() - self.init
+    
+    def timeOut(self) -> bool:
+        self.elapsed = time.time() - self.init
+        return self.elapsed > self.cooldown
+    
+    def reset(self) -> None:
+        self.init = time.time()
+        self.elapsed = time.time() - self.init
