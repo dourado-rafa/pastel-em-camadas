@@ -32,6 +32,20 @@ def datagrama(type:int=0, server_number:int=0, total:int=0, current:int=0, id:in
     size_id = len(payload) if id == 0 else id
     return bytearray(head(type, server_number, total, current, size_id, restart, sucess) + payload + eop)
 
+def localTime(time_msg):
+    return datetime.fromtimestamp(time_msg)
+
+def write_line(arq, time:float, env_reb:str, tipo:int, tamanho:int, current:int=0, total:int=0):
+    line = ""
+    line += datetime.fromtimestamp(time).strftime("%m/%d/%Y, %H:%M:%S")
+    line += f" {env_reb}"
+    if current != 0:
+        line += f" {tipo}/ {tamanho} / {current} / {total}"
+    else:
+        line += f" {tipo}/ {tamanho}"
+    line += "\n"
+    arq.write(line)
+
 
 class Message():
     def __init__(self, type:int=0, server_number:int=0, total:int=0, current:int=0, size_id:int=0, restart:int=0, sucess:int=0, crc:bytearray=b'', payload:bytearray=b'', eop:bytearray=b'', length:int=0) -> None:
