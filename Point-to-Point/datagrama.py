@@ -35,13 +35,13 @@ def datagrama(type:int=0, server_number:int=0, total:int=0, current:int=0, id:in
     return bytearray(head + payload + eop)
 
 
-def write_line(arq, time:float, env_reb:str, tipo:int, tamanho:int, current:int=0, total:int=0):
+def write_line(arq, time:float, env_reb:str, tipo:int, tamanho:int=14, current:int=0, total:int=0):
     line = ""
-    line += datetime.fromtimestamp(time).strftime("%m/%d/%Y, %H:%M:%S")
-    line += f" {env_reb}"
+    line += datetime.fromtimestamp(time).strftime("%d/%m/%Y %I:%M:%S:%f")[:-3]
+    line += f"| {env_reb} |"
     if current != 0:
-        line += f" {tipo}/ {tamanho} / {current} / {total}"
+        line += f" {tipo} | {tamanho} | {current} | {total}"
     else:
-        line += f" {tipo}/ {tamanho}"
+        line += f" {tipo} | {tamanho}"
     line += "\n"
     arq.write(line)
