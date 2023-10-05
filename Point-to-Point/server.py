@@ -21,6 +21,7 @@ def receive_message(com:enlace, log:Log, head_length:int=10, eop_expected:bytear
                 log.write('RECEBIMENTO', datagrama)
                 return read_datagrama(datagrama)
     com.rx.clearBuffer()
+    time.sleep(.01)
     return Message()
 
 def send_message(com:enlace, log:Log, datagrama:bytearray) -> None:
@@ -38,8 +39,8 @@ def main():
         print("Abriu a comunicação")
         
         # Escreva o código aqui:
-        status = 'IDLE'
-        global total, current
+        status, idle = 'IDLE', True
+        global total, current, last_sucess
         global ressend_timer, wait_timer
         global log, data
 
@@ -53,7 +54,7 @@ def main():
                 if message.isValid() and message.type == 1 and message.server_number == SERVER_NUMBER:
                     log.set_id(message.id)
                     data = []
-                    total, current = message.total, 1
+                    total, current, last_sucess = message.total, 1, 1
                     ressend_timer = Timer(2)
                     wait_timer = Timer(20)
                     send_message(com1, log, datagrama(type=2))
@@ -64,25 +65,28 @@ def main():
                 if total >= current:
                     message = receive_message(com1, log)
                     if message.type == 3:
+                        idle = False
                         if message.isValid() and message.current == current:
+                            last_sucess = current
+                            send_message(com1, log, datagrama(type=4, sucess=last_sucess))
                             color_print(f'Pacote [{current}|{total}] recebido com sucesso!', 'green')
-                            send_message(com1, log, datagrama(type=4, sucess=current))
                             data.append(message.payload)
                             current += 1
                         else:
-                            color_print(f'Erro! Pacote [{message.current}|{total}] enviado, mas era esperado o pacote [{current}|{total}]', 'red')
+                            color_print(f'Erro! Pacote [{message.current}|{total}] recebido, mas era esperado o pacote [{current}|{total}]', 'red')
                             com1.rx.clearBuffer()
                             send_message(com1, log, datagrama(type=6, restart=current))
                         ressend_timer.reset()
                         wait_timer.reset()
 
-                    else:
+                    elif not idle:
                         time.sleep(1)
                         if wait_timer.timeOut():
                             send_message(com1, log, datagrama(type=5))
+                            idle = True
                             status = 'OFFLINE'
                         elif ressend_timer.timeOut():
-                            send_message(com1, log, datagrama(type=4, sucess=current))
+                            send_message(com1, log, datagrama(type=4, sucess=last_sucess))
                             ressend_timer.reset()
 
                 else:

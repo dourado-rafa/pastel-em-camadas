@@ -1,6 +1,7 @@
 import numpy as np
 from datetime import datetime
 import time
+from datagrama import CRC
 
 
 COLORS = {
@@ -29,6 +30,7 @@ class Message():
         self.restart = restart
         self.sucess = sucess
         self.crc = crc
+        self.integrity = (crc == CRC.checksum(payload).to_bytes(2))
         self.payload = payload
         self.eop = eop
         self.length = length
@@ -44,7 +46,7 @@ class Message():
         return text
         
     def isValid(self) -> bool:
-        return (1 <= self.type <=6 and self.length > 0 and self.eop == b'\xAA\xBB\xCC\xDD')
+        return (1 <= self.type <=6 and self.length > 0 and self.eop == b'\xAA\xBB\xCC\xDD' and self.integrity)
 
 
 def unpack_datagrama(datagrama:bytearray, head_length:int=10) -> tuple[bytearray,bytearray,bytearray]:
@@ -104,7 +106,7 @@ class Log():
         message = read_datagrama(datagrama)
         text = f'\n[{datetime.now().strftime("%d/%m/%Y %I:%M:%S:%f")[:-3]}] {type.upper():11} | '+'{type}'+f' | {message.length:03}'
         if message.type == 3:
-            text += f' | [{message.current:03}|{message.total:03}]'
+            text += f' | [{message.current:03}|{message.total:03}] | {int.from_bytes(message.crc)}'
         
         self.text += text.format(type=message.type)
         if self.log is not None:
