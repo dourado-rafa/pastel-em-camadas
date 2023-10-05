@@ -30,7 +30,7 @@ class Message():
         self.restart = restart
         self.sucess = sucess
         self.crc = crc
-        self.integrity = (crc == CRC.checksum(payload).to_bytes(2))
+        self.integrity = (CRC.checksum(payload + crc.to_bytes(2)) == 0)
         self.payload = payload
         self.eop = eop
         self.length = length
