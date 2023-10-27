@@ -7,13 +7,6 @@ import sounddevice as sd
 import matplotlib.pyplot as plt
 import time
 
-
-#funcao para transformas intensidade acustica em dB, caso queira usar
-def todB(s):
-    sdB = 10*np.log10(s)
-    return(sdB)
-
-
 def main():
 
     #*****************************instruções********************************
@@ -75,17 +68,16 @@ def main():
     #"min_dist" é relatico tolerancia. Ele determina quao próximos 2 picos identificados podem estar, ou seja, se a funcao indentificar um pico na posicao 200, por exemplo, só identificara outro a partir do 200+min_dis. Isso evita que varios picos sejam identificados em torno do 200, uma vez que todos sejam provavelmente resultado de pequenas variações de uma unica frequencia a ser identificada.   
     # Comece com os valores:
     index = peakutils.indexes(yf, thres=0.2, min_dist=40)
-    #print("index de picos {}" .format(index)) #yf é o resultado da transformada de fourier
 
     #printe os picos encontrados! 
     # Aqui você deverá tomar o seguinte cuidado: A funcao  peakutils.indexes retorna as POSICOES dos picos. Não os valores das frequências onde ocorrem! Pense a respeito
-    frequencias_id = [xf[i] for i in index]
+    frequencias_id = [int(xf[i]) for i in index]
     print(f"todas as frequencias: {frequencias_id}")
 
     f_intervalo = []
     for valor in index:
         if xf[valor] > 600 and xf[valor] < 1500:
-            f_intervalo.append(xf[valor])
+            f_intervalo.append(int(xf[valor]))
     
     print(f"frequências identificadas no intervalo: {f_intervalo}")
 
@@ -97,7 +89,6 @@ def main():
     f_numeros = [[941, 1209], [697, 1209], [697, 1336], [697, 1477], [770, 1209], [770, 1336], [770, 1477], [852, 1209], [852, 1336], [852, 1477]]
 
     baixas = [frequencia[0] for frequencia in f_numeros]
-    print(baixas)
     menor_dif = 100
     f_baixa = 0
     for frequencia_id in f_intervalo:
@@ -105,11 +96,7 @@ def main():
             if abs(frequencia - frequencia_id) < menor_dif:
                 menor_dif = abs(frequencia - frequencia_id)
                 f_baixa = frequencia
-    
-    print(f_baixa)
-
     provaveis = [numero for numero in f_numeros if numero[0]==f_baixa]
-    print(provaveis)
     altas = [frequencia[1] for frequencia in provaveis]
 
     menor_dif = 100

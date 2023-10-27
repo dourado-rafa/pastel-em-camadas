@@ -57,17 +57,17 @@ def main():
     sd.play(signal, samplerate)
     sd.wait() # aguarda fim do audio
     
-    # plt.figure()
-    # freqs, ampls = calcFFT(signal, samplerate)
-    # plt.stem(freqs, np.abs(ampls))
-    # plt.xlim(0, 1500)
+    plt.figure()
+    freqs, ampls = calcFFT(signal, samplerate)
+    plt.stem(freqs, np.abs(ampls))
+    plt.xlim(0, 1500)
 
-    # plt.figure()
-    # plt.plot(t[0:1000], signal[0:1000], '-')
-    # plt.show()
+    plt.figure()
+    plt.plot(t[0:1000], signal[0:1000], '-')
+    plt.show()
 
     print('Salvando onda gerada')
-    wavfile.write(f'onda{number}.wav', samplerate, signal.astype(np.int16)*1000)
+    wavfile.write(f'ondas/onda{number}.wav', samplerate, signal.astype(np.int16)*1000)
 
 if __name__ == '__main__':
     main()
