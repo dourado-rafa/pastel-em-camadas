@@ -17,6 +17,14 @@ def calcFFT(signal:np.ndarray, samplerate:int) -> tuple[np.ndarray, np.ndarray]:
     ampls = fft(signal)
     return(freqs, fftshift(ampls))
 
+def low_pass_filter(signal:np.ndarray) -> np.ndarray: 
+    a, b, c, d, e = 0.03365, 0.02783, 1, -1.504, 0.5656 # f_corte = 2000 
+
+    filtered_signal = [signal[0], signal[1]]
+    for i in range(2, len(signal)):
+        filtered_signal.append(-d*filtered_signal[i-1] -e*filtered_signal[i-2] + a*signal[i-1] + b*signal[i-2])
+    return np.array(filtered_signal)
+
 
 if __name__ == "__main__":
     samplerate = 44100
