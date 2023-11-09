@@ -1,19 +1,15 @@
 from module import calcFFT, generateSin
 import numpy as np
 import sounddevice as sd
-import soundfile as sf
+from scipy.io import wavfile as sf
 import matplotlib.pyplot as plt
 
 def main():
     
-    signal, samplerate = sf.read('audios/signal.wav', dtype='float32') # Lendo o arquivo WAV signal
+    samplerate, signal = sf.read('audios/auau.wav') # Lendo o arquivo WAV signal
     filtrado = []
 
-    a = 0.003285
-    b = 0.003108
-    c = 1
-    d = -1.84
-    e = 0.8465
+    a, b, c, d, e = 0.03365, 0.02783, 1, -1.504, 0.5656 # f_corte = 2000 
 
     filtrado.append(signal[0])
     filtrado.append(signal[1])
@@ -23,7 +19,7 @@ def main():
         filtrado.append(valor)
 
 
-    sf.write('audios/encoded.wav', filtrado, samplerate) # Criando arquivo WAV modulado
+    sf.write('audios/encoded.wav', samplerate, filtrado) # Criando arquivo WAV modulado
 
 
 if __name__ == "__main__":
